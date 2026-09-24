@@ -1,0 +1,24 @@
+manifestVersion: 1
+id: note-printer
+category: files
+name: Note Printer
+version: "0.1.0"
+tagline: Print je notities direct op een DYMO-label
+description: >-
+  Schrijf een korte notitie op je telefoon of computer en print die rechtstreeks
+  op een via USB aangesloten DYMO LabelWriter 400 of 450. Bekijk vooraf het
+  99014-label, kies het aantal exemplaren en voeg optioneel datum en tijd toe.
+releaseNotes: >-
+  Eerste versie met een mobiele notitie-editor, voorbeeld als PDF,
+  automatische printerdetectie en rechtstreeks printen op DYMO 99014.
+developer: Kevin van Krugten
+website: https://github.com/TheRoyalCaptain/Note-Printer
+dependencies: []
+repo: https://github.com/TheRoyalCaptain/Note-Printer
+support: https://github.com/TheRoyalCaptain/Note-Printer/issues
+port: 8766
+gallery: []
+path: ""
+icon: https://raw.githubusercontent.com/TheRoyalCaptain/Note-Printer/main/note-printer/icon.svg
+submitter: Kevin van Krugten
+submission: https://github.com/TheRoyalCaptain/Note-Printer
