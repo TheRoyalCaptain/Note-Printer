@@ -1,14 +1,23 @@
 import io
+import base64
+import os
+import tempfile
 import unittest
 from unittest.mock import patch
 
 from pypdf import PdfReader
+from PIL import Image
 
 import app as note_printer
 
 
 class NotePrinterTests(unittest.TestCase):
     def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        patcher = patch.dict(os.environ, {"NOTE_PRINTER_DATA_DIR": temporary.name})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.client = note_printer.app.test_client()
 
     def test_preview_has_exact_label_size(self):
@@ -95,6 +104,66 @@ class NotePrinterTests(unittest.TestCase):
     def test_unrecognised_template_is_rejected(self):
         response = self.client.post('/api/preview', json={'template': 'other', 'body': 'Test'})
         self.assertEqual(response.status_code, 400)
+
+    def test_saved_template_note_and_history_can_be_reused(self):
+        payload = {'title': 'Belangrijk', 'body': 'Vergeet je afspraak niet', 'template': 'appointment',
+                   'heading': 'MORGEN', 'font_size': 12, 'event_at': '2026-09-25T14:00', 'icon': 'warning'}
+        saved_template = self.client.post('/api/templates', json={'name': 'Mijn afspraak', 'note': payload})
+        self.assertEqual(saved_template.status_code, 200)
+        template_id = saved_template.json['id']
+        restored = self.client.get(f'/api/templates/{template_id}').json['item']['payload']
+        self.assertEqual(restored['heading'], 'MORGEN')
+        self.assertEqual(restored['event_at'], '25-09-2026 14:00')
+        saved_note = self.client.post('/api/notes', json=payload)
+        self.assertEqual(saved_note.status_code, 200)
+        self.assertEqual(self.client.get(f"/api/notes/{saved_note.json['id']}").json['item']['payload']['body'], payload['body'])
+        with patch.object(note_printer, 'configure_printer'), patch.object(note_printer, 'command') as command:
+            command.return_value.returncode = 0
+            command.return_value.stdout = 'request id is NotePrinter-123'
+            self.assertEqual(self.client.post('/api/print', json=payload).status_code, 200)
+            history = self.client.get('/api/history').json['items']
+            self.assertEqual(history[0]['status'], 'sent')
+            self.assertEqual(self.client.post(f"/api/history/{history[0]['id']}/reprint").status_code, 200)
+            self.assertEqual(command.call_count, 2)
+
+    def test_photo_and_extra_fields_fit_on_label(self):
+        image = Image.new('RGB', (80, 70), color='navy')
+        output = io.BytesIO()
+        image.save(output, format='JPEG')
+        photo = 'data:image/jpeg;base64,' + base64.b64encode(output.getvalue()).decode()
+        response = self.client.post('/api/preview', json={
+            'template': 'message', 'title': 'Berichtje', 'body': 'Ik ben later thuis.',
+            'recipient': 'Simon', 'sender': 'Kevin', 'photo': photo,
+        })
+        self.assertEqual(response.status_code, 200, response.json if response.is_json else None)
+        page = PdfReader(io.BytesIO(response.data)).pages[0]
+        text = page.extract_text()
+        self.assertIn('AAN: Simon', text)
+        self.assertIn('VAN: Kevin', text)
+        self.assertEqual(float(page.mediabox.width), 154)
+
+    def test_own_heading_is_printed_on_free_layout(self):
+        payload = {'heading': 'MIJN LABEL', 'title': 'Eigen sjabloon', 'body': 'Een eigen indeling'}
+        layout = self.client.post('/api/layout', json=payload)
+        self.assertEqual(layout.json['style'], 'free')
+        pdf = self.client.post('/api/preview', json=payload)
+        self.assertIn('MIJN LABEL', PdfReader(io.BytesIO(pdf.data)).pages[0].extract_text())
+
+    def test_frontend_assets_are_served(self):
+        page = self.client.get('/')
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b'/static/app.js', page.data)
+        self.assertIn(b'/static/style.css', page.data)
+        for path in ('/static/app.js', '/static/style.css'):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            response.close()
+
+    def test_cancel_only_accepts_own_queue_job(self):
+        with patch.object(note_printer, 'command') as command:
+            result = self.client.post('/api/printer/cancel', json={'job': 'OtherPrinter-2; rm -rf /'})
+        self.assertEqual(result.status_code, 400)
+        command.assert_not_called()
 
 
 if __name__ == '__main__':

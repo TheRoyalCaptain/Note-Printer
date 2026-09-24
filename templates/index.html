@@ -3,71 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#121d2b">
+  <meta name="theme-color" content="#111d2c">
   <title>Note Printer</title>
-  <style>
-    :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f4f6fb;background:#0c1420;font-synthesis:none}
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 80% 0%,#1c3552 0%,#0c1420 50%)}
-    header,main{max-width:1080px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:34px}
-    h1{font-size:clamp(29px,5vw,44px);letter-spacing:-.045em;margin:4px 0 0}h2{font-size:19px;margin:0 0 17px}p{color:#a8b4c4}
-    .eyebrow{color:#79cbb5;letter-spacing:.16em;text-transform:uppercase;font-weight:800;font-size:11px}.status{border-radius:50px;background:#202e3e;padding:10px 14px;color:#d8e2ed;font-size:13px;white-space:nowrap}.status.good{background:#164536;color:#a4f0d3}
-    main{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.8fr);gap:22px}.panel{padding:27px;border-radius:24px;background:#152131;border:1px solid #2c394b;box-shadow:0 16px 50px #050c1740}
-    label{font-size:14px;font-weight:700;display:block;margin:19px 0 8px}input[type=text],textarea,input[type=number],select{width:100%;font:inherit;color:#fff;border:1px solid #44536a;border-radius:12px;background:#0d1725;padding:13px 14px;outline:none}textarea{min-height:190px;resize:vertical;line-height:1.5}input:focus,textarea:focus,select:focus{border-color:#79cbb5;box-shadow:0 0 0 3px #79cbb520}
-    .row{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin:20px 0}.row label{margin:0}.copies{width:88px!important}.check{display:flex;align-items:center;gap:8px}.check input{accent-color:#79cbb5;width:18px;height:18px}
-    button{appearance:none;border:0;border-radius:13px;padding:14px 17px;font:inherit;font-weight:800;cursor:pointer;background:#78d5b9;color:#08251e}button:disabled{opacity:.5;cursor:wait}.secondary{background:#2e4054;color:#e9f1f5} .buttons{display:flex;flex-wrap:wrap;gap:10px}
-    #message{min-height:22px;font-size:14px;margin:16px 0 0}.error{color:#ffaaa7}.success{color:#95e9c8}
-    .preview-area{display:grid;place-items:center;background:#0b1726;border:1px dashed #475a72;border-radius:18px;padding:25px;min-height:490px}.paper{width:228px;height:426px;background:white;color:#17202b;padding:17px;box-shadow:0 16px 35px #0005;overflow:hidden;display:flex;flex-direction:column;overflow-wrap:anywhere}.paper strong{font-size:19px;line-height:1.22;white-space:pre-wrap}.paper hr{width:100%;border:0;border-top:1px solid #aaa;margin:13px 0}.paper .content{font-size:13px;line-height:1.35;white-space:pre-wrap;overflow:hidden}.paper .item{display:flex;gap:6px}.paper .box{border:1px solid #17202b;width:9px;height:9px;flex:none;margin-top:3px}.paper small{margin-top:auto;color:#666;font-size:10px;padding-top:10px}.hint{font-size:12px;line-height:1.5;margin:15px 0 0}.template-row{display:flex;gap:8px;align-items:center}.template-row select{flex:1;min-width:0}.section-label{font-size:12px;color:#8fa5ba;text-transform:uppercase;letter-spacing:.1em;margin:22px 0 8px}.count{color:#a4f0d3;font-weight:700}.qr-mark{border:2px solid #17202b;align-self:flex-start;padding:13px;font-size:11px;font-weight:700;margin-top:auto}.note{font-size:12px;color:#a8b4c4;line-height:1.4}
-    .paper .kicker{display:none;font-size:12px;font-weight:850;letter-spacing:.09em;margin-bottom:11px}.paper.shopping .kicker{display:block;color:#fff;background:#17202b;text-align:center;border-radius:4px;padding:8px 1px}.paper.tasks .kicker{display:block;border-bottom:3px solid #17202b;padding-bottom:8px}.paper.reminder .kicker{display:block;border-left:5px solid #17202b;border-bottom:1px solid #777;padding:6px}.paper.message .kicker{display:block;text-align:center;border-bottom:1px solid #aaa;padding-bottom:7px}.paper.reminder strong{font-size:23px}.paper.message strong{font-size:16px}.paper.shopping .content .end,.paper.tasks .content .end{border-bottom:1px solid #ddd;padding-bottom:5px;margin-bottom:4px}.paper.tasks .number{font-size:10px;font-weight:800;min-width:12px}.paper.reminder .content{border-left:3px solid #17202b;padding-left:8px}.paper.message .content{border:1px solid #999;border-radius:6px;padding:8px}.paper .continuation{padding-left:15px}.paper.tasks .continuation{padding-left:28px}.paper.message .continuation,.paper.reminder .continuation{padding-left:0}.paper .item span:last-child{min-width:0}
-    @media(max-width:760px){main{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}.panel{padding:20px}.preview-area{min-height:470px}}
-  </style>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <header><div><div class="eyebrow">Jouw Umbrel · DYMO 400/450</div><h1>Note Printer</h1><p>Typ een notitie. Print hem meteen als label.</p></div><div id="status" class="status" role="status">Printer controleren…</div></header>
-  <main>
-    <section class="panel"><h2>Nieuwe notitie</h2><form id="form"><label for="template">Labelindeling</label><div class="template-row"><select id="template"><option value="">Vrije notitie</option><option value="shopping">Boodschappen</option><option value="tasks">Taken</option><option value="reminder">Herinnering</option><option value="message">Berichtje</option></select><button class="secondary" id="apply-template" type="button">Toepassen</button></div><p class="note">Het sjabloon bepaalt ook de opmaak van het geprinte label. Toepassen vult titel en voorbeeldtekst in; je kunt die daarna wijzigen. Vrije notitie behoudt je tekst.</p><label for="title">Titel <span style="font-weight:400;color:#a8b4c4">(optioneel)</span></label><input id="title" type="text" maxlength="80" placeholder="Bijvoorbeeld: Niet vergeten"><label for="body">Notitie</label><textarea id="body" maxlength="2500" placeholder="Schrijf hier wat je wilt printen…"></textarea><p class="section-label">Afdrukopties</p><div class="row"><label for="copies">Aantal</label><input class="copies" id="copies" type="number" min="1" max="10" value="1"><label class="check" for="date"><input id="date" type="checkbox">Datum en tijd</label></div><div class="row"><label class="check" for="checklist"><input id="checklist" type="checkbox">Afvinkvakje voor elke regel</label><label class="check" for="paginate"><input id="paginate" type="checkbox">Meerdere labels bij lange tekst</label></div><label for="qr">QR-code <span style="font-weight:400;color:#a8b4c4">(optioneel)</span></label><input id="qr" type="text" maxlength="300" placeholder="Link of tekst om te scannen"><p class="note">De QR-code staat op het laatste label.</p><div class="buttons"><button id="print" type="submit">Print notitie</button><button id="preview-pdf" class="secondary" type="button">Exact voorbeeld (PDF)</button></div><div id="message" aria-live="polite"></div></form></section>
-    <section class="panel"><h2>Labelvoorbeeld</h2><p id="page-count" class="count" aria-live="polite">Vul een notitie in</p><div class="preview-area"><div class="paper" id="paper"><span class="kicker" id="preview-kicker"></span><strong id="preview-title"></strong><hr id="rule" hidden><div class="content" id="preview-body"></div><div class="qr-mark" id="preview-qr" hidden>QR op laatste label</div><small id="preview-date"></small></div></div><p class="hint">Voor DYMO 99014, circa 54 × 101 mm. De weergave toont het eerste label. Open “Exact voorbeeld” om alle labels en de echte QR-code te zien.</p></section>
+  <header class="shell header">
+    <div><div class="eyebrow">Jouw Umbrel · DYMO 400/450</div><h1>Note Printer</h1><p>Een gedachte op papier, zonder gedoe.</p></div>
+    <div id="status" class="status" role="status">Printer controleren…</div>
+  </header>
+  <nav class="shell tabs" aria-label="Onderdelen">
+    <button class="tab active" data-view="compose" type="button">Nieuwe notitie</button>
+    <button class="tab" data-view="saved" type="button">Opgeslagen</button>
+    <button class="tab" data-view="history" type="button">Afdrukken</button>
+    <button class="tab" data-view="printer" type="button">Printer</button>
+  </nav>
+  <main class="shell">
+    <div id="compose" class="view composer">
+      <section class="panel">
+        <div class="panel-head"><h2>Maak je label</h2><button id="new-note" class="text-button" type="button">Leeg maken</button></div>
+        <form id="form">
+          <label for="template">Labelindeling</label>
+          <div class="template-row"><select id="template"><option value="">Vrije notitie</option><option value="shopping">Boodschappen</option><option value="tasks">Taken</option><option value="reminder">Herinnering</option><option value="message">Berichtje</option><option value="appointment">Afspraak</option><option value="parcel">Pakket</option><option value="warning">Waarschuwing</option><option value="instructions">Instructies</option><option value="contact">Contact</option><optgroup id="my-templates" label="Mijn sjablonen"></optgroup></select><button class="secondary" id="apply-template" type="button">Toepassen</button></div>
+          <p class="hint">Een sjabloon past de tekst én de indeling van het geprinte label aan.</p>
+          <label for="title">Titel <span class="optional">(optioneel)</span></label><input id="title" type="text" maxlength="80" placeholder="Bijvoorbeeld: Niet vergeten">
+          <label for="body">Notitie</label><textarea id="body" maxlength="2500" placeholder="Schrijf hier je notitie…"></textarea>
+          <div class="two-fields">
+            <div><label for="recipient">Aan <span class="optional">(optioneel)</span></label><input id="recipient" type="text" maxlength="80" placeholder="Voor wie is dit?"></div>
+            <div><label for="sender">Van <span class="optional">(optioneel)</span></label><input id="sender" type="text" maxlength="80" placeholder="Van wie komt dit?"></div>
+          </div>
+          <label for="event-at">Datum en tijd van afspraak of herinnering <span class="optional">(optioneel)</span></label><input id="event-at" type="datetime-local">
+          <details id="layout-details" class="details"><summary>Eigen opmaak en sjabloon bewaren</summary>
+            <div class="two-fields"><div><label for="custom-name">Naam van mijn sjabloon</label><input id="custom-name" type="text" maxlength="50" placeholder="Mijn sjabloon"></div><div><label for="custom-layout">Indeling</label><select id="custom-layout"><option value="">Vrije notitie</option><option value="shopping">Boodschappen</option><option value="tasks">Taken</option><option value="reminder">Herinnering</option><option value="message">Berichtje</option><option value="appointment">Afspraak</option><option value="parcel">Pakket</option><option value="warning">Waarschuwing</option><option value="instructions">Instructies</option><option value="contact">Contact</option></select></div></div>
+            <div class="two-fields"><div><label for="heading">Koptekst op het label</label><input id="heading" type="text" maxlength="30" placeholder="Bijvoorbeeld: BELANGRIJK"></div><div><label for="font-size">Tekstgrootte</label><select id="font-size"><option value="0">Automatisch</option><option value="8">Klein</option><option value="10">Normaal</option><option value="12">Groot</option><option value="14">Extra groot</option></select></div></div>
+            <div class="buttons"><button class="secondary" id="save-template" type="button">Sjabloon bewaren</button><button class="secondary" id="save-as-template" type="button">Als nieuw sjabloon</button><button class="danger" id="delete-template" type="button" hidden>Sjabloon verwijderen</button></div>
+          </details>
+          <h3>Afdrukopties</h3>
+          <div class="option-row"><label for="copies">Aantal</label><input class="copies" id="copies" type="number" min="1" max="10" value="1"><label class="check" for="date"><input id="date" type="checkbox">Printdatum</label></div>
+          <div class="option-row"><label class="check" for="checklist"><input id="checklist" type="checkbox">Afvinkvakjes</label><label class="check" for="paginate"><input id="paginate" type="checkbox">Meerdere labels bij lange tekst</label></div>
+          <div class="two-fields"><div><label for="icon">Pictogram</label><select id="icon"><option value="">Geen</option><option value="warning">Waarschuwing</option><option value="info">Informatie</option><option value="star">Ster</option><option value="heart">Hart</option><option value="home">Huis</option></select></div><div><label for="photo">Of een foto</label><input id="photo" type="file" accept="image/*"><button id="clear-photo" class="text-button" type="button" hidden>Foto verwijderen</button></div></div>
+          <label for="qr">QR-code <span class="optional">(optioneel)</span></label><input id="qr" type="text" maxlength="300" placeholder="Link of tekst om te scannen"><p class="hint">De QR-code komt op het laatste label. Foto's worden lokaal naar zwart-wit omgezet.</p>
+          <div class="buttons primary-actions"><button id="print" type="submit">Print notitie</button><button id="preview-pdf" class="secondary" type="button">Exact voorbeeld</button><button id="save-note" class="secondary" type="button">Notitie bewaren</button></div>
+          <p id="message" class="feedback" aria-live="polite"></p>
+        </form>
+      </section>
+      <aside class="panel preview-panel"><h2>Labelvoorbeeld</h2><p id="page-count" class="count" aria-live="polite">Vul een notitie in</p><div class="preview-area"><div class="paper" id="paper"><span class="kicker" id="preview-kicker"></span><strong id="preview-title"></strong><hr id="rule" hidden><div class="meta" id="preview-meta"></div><div id="preview-art" class="art" hidden></div><div class="content" id="preview-body"></div><div class="qr-mark" id="preview-qr" hidden>QR op laatste label</div><small id="preview-date"></small></div></div><p class="hint">De weergave toont het eerste 99014-label. Het exacte PDF-voorbeeld toont alle vervolglabels.</p></aside>
+    </div>
+    <section id="saved" class="panel view" hidden><div class="panel-head"><div><h2>Opgeslagen notities</h2><p>Open, wijzig of print je notities opnieuw.</p></div><button class="secondary refresh" data-refresh="saved" type="button">Vernieuwen</button></div><div id="saved-list" class="list"></div></section>
+    <section id="history" class="panel view" hidden><div class="panel-head"><div><h2>Afdrukgeschiedenis</h2><p>Iedere verzonden of mislukte afdruk verschijnt hier.</p></div><button class="secondary refresh" data-refresh="history" type="button">Vernieuwen</button></div><div id="history-list" class="list"></div></section>
+    <section id="printer" class="panel view" hidden><div class="panel-head"><div><h2>Printer en wachtrij</h2><p>DYMO-aansluiting en lopende afdrukken.</p></div><button class="secondary refresh" data-refresh="printer" type="button">Vernieuwen</button></div><div id="printer-details"></div><h3>Afdrukwachtrij</h3><div id="job-list" class="list"></div><h3>iPhone-snelkoppeling</h3><p>Maak in Siri Opdrachten een opdracht die de tekst ontvangt, met <b>URL encodeer</b> omzet en vervolgens de onderstaande URL met de gecodeerde tekst erachter opent. Note Printer vult de tekst in; jij bekijkt het label en drukt op Print.</p><div class="template-row"><input id="shortcut-url" type="text" readonly aria-label="Start van de snelkoppeling-URL"><button id="copy-shortcut" class="secondary" type="button">Kopieer URL</button></div><p class="hint">Gebruik <b>Open URL's</b> als laatste actie. Je bestaande Umbrel-toegang blijft vereist.</p></section>
   </main>
-  <script>
-    const $=id=>document.getElementById(id), fields=['title','body','copies','date','checklist','paginate','qr'];
-    let activeTemplate='';
-    const headings={shopping:'BOODSCHAPPEN',tasks:'TAKEN',reminder:'HERINNERING',message:'BERICHT'};
-    const data=()=>({title:$('title').value,body:$('body').value,copies:Number($('copies').value),date:$('date').checked,checklist:$('checklist').checked,paginate:$('paginate').checked,qr:$('qr').value,template:activeTemplate});
-    const templates={shopping:{title:'Boodschappen',body:'Brood\nMelk\nGroente',checklist:true},tasks:{title:'Taken',body:'Eerste taak\nTweede taak',checklist:true},reminder:{title:'Niet vergeten',body:'Wat moet ik onthouden?',checklist:false},message:{title:'Berichtje',body:'Schrijf hier je bericht',checklist:false}};
-    $('apply-template').addEventListener('click',()=>{activeTemplate=$('template').value;const t=templates[activeTemplate];if(t){$('title').value=t.title;$('body').value=t.body;$('checklist').checked=t.checklist}message(t?'Sjabloon en labelopmaak toegepast.':'Vrije indeling toegepast.');update()});
-    let updateTimer=0,updateSerial=0;
-    function update(){
-      const d=data();clearTimeout(updateTimer);const serial=++updateSerial;
-      $('paper').className='paper '+d.template;
-      $('preview-kicker').textContent=headings[d.template]||'';
-      $('preview-title').textContent=d.title;
-      $('rule').hidden=!d.title||!d.body||['reminder','message'].includes(d.template);
-      $('preview-qr').hidden=!d.qr;
-      $('preview-date').textContent=d.date?new Date().toLocaleString('nl-NL',{dateStyle:'short',timeStyle:'short'}):'';
-      $('page-count').textContent='Labels berekenen…';
-      if(!d.title&&!d.body&&!d.qr){$('preview-body').textContent='';$('page-count').textContent='Vul een notitie in';return}
-      updateTimer=setTimeout(async()=>{
-        try{
-          const r=await fetch('api/layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
-          const j=await r.json();if(serial!==updateSerial)return;if(!r.ok)throw Error(j.error);
-          $('preview-title').textContent=j.title;
-          $('rule').hidden=!j.title||!d.body||['reminder','message'].includes(d.template);
-          $('page-count').textContent=j.pages+' '+(j.pages===1?'label':'labels')+' per exemplaar'+(d.copies>1?' · '+(j.pages*d.copies)+' afdrukken totaal':'');
-          $('preview-qr').hidden=!d.qr||j.pages>1;
-          $('preview-body').replaceChildren();
-          for(const line of j.first_page){
-            const row=document.createElement('div');row.className=(line.checkbox?'item':'continuation')+(line.last?' end':'');
-            if(d.template==='tasks'&&line.checkbox){const number=document.createElement('span');number.className='number';number.textContent=line.number+'.';row.appendChild(number)}
-            if(d.checklist&&line.checkbox){const box=document.createElement('span');box.className='box';row.appendChild(box)}
-            const content=document.createElement('span');content.textContent=line.text||' ';row.appendChild(content);$('preview-body').appendChild(row);
-          }
-        }catch(e){if(serial===updateSerial){$('page-count').textContent=e.message;$('preview-body').textContent=''}}
-      },200)
-    }
-    fields.forEach(id=>$(id).addEventListener('input',update));update();
-    async function status(){try{const r=await fetch('api/status');const j=await r.json();$('status').textContent=j.message+(j.model?' · '+j.model:'');$('status').className='status'+(j.connected?' good':'')}catch{$('status').textContent='Printerstatus niet beschikbaar'}}status();setInterval(status,15000);
-    function message(text,error=false){$('message').textContent=text;$('message').className=error?'error':'success'}
-    async function action(kind){const btn=$(kind==='print'?'print':'preview-pdf');const tab=kind==='preview'?window.open('','_blank'):null;btn.disabled=true;message('Bezig…');try{const r=await fetch('api/'+kind,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data())});if(!r.ok){const j=await r.json();throw Error(j.error||'Er is iets misgegaan.')}if(kind==='preview'){const blob=await r.blob();const url=URL.createObjectURL(blob);if(tab){tab.location.href=url}else{const link=document.createElement('a');link.href=url;link.download='notitie.pdf';link.click()}setTimeout(()=>URL.revokeObjectURL(url),60000);message('Voorbeeld geopend.')}else{const j=await r.json();message(j.message+'.');status()}}catch(e){if(tab)tab.close();message(e.message,true)}finally{btn.disabled=false}}
-    $('form').addEventListener('submit',e=>{e.preventDefault();action('print')});$('preview-pdf').addEventListener('click',()=>action('preview'));
-  </script>
 </body>
 </html>

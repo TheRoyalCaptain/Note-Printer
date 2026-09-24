@@ -6,5 +6,8 @@ services:
       - "8080:8080"
     volumes:
       - /dev/bus/usb:/dev/bus/usb
+      - note-printer-data:/data
     device_cgroup_rules:
       - 'c 189:* rmw'
+volumes:
+  note-printer-data:

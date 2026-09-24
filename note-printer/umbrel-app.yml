@@ -2,22 +2,18 @@ manifestVersion: 1
 id: note-printer
 category: files
 name: Note Printer
-version: "0.3.0"
+version: "0.4.0"
 tagline: Print je notities direct op een DYMO-label
 description: >-
   Schrijf een korte notitie op je telefoon of computer en print die rechtstreeks
   op een via USB aangesloten DYMO LabelWriter 400 of 450. Bekijk vooraf het
   99014-label, kies het aantal exemplaren en voeg optioneel datum en tijd toe.
 releaseNotes: >-
-  v0.3.0 geeft elk sjabloon een eigen afdrukindeling: boodschappen krijgen
-  een donkere kop en afvinkregels, taken een genummerde lijst, herinneringen
-  een opvallende titel en accentlijn, en berichten een omkaderde tekst.
-  Het voorbeeld toont dezelfde gekozen stijl. De indeling blijft behouden
-  op vervolglabels en bij notities met een QR-code.
-  v0.2.0 voegt sjablonen voor boodschappen, taken, herinneringen en berichten toe.
-  Elke regel kan een afvinkvakje krijgen. Lange notities kunnen optioneel over
-  meerdere genummerde labels worden verdeeld; een QR-code met tekst of een link
-  verschijnt op het laatste label. Het voorbeeld toont het aantal labels.
+  v0.4.0 voegt vijf labelsjablonen toe, plus eigen sjablonen met indeling,
+  koptekst en lettergrootte. Bewaar en heropen notities; bekijk de printerwachtrij
+  en afdrukgeschiedenis, en print eerdere labels opnieuw. Voeg Aan, Van en een
+  afspraakdatum toe, of kies een zwart-witfoto of pictogram. Een iPhone-opdracht
+  kan tekst in de editor openen, waarna je de afdruk bevestigt.
 developer: Kevin van Krugten
 website: https://github.com/TheRoyalCaptain/Note-Printer
 dependencies: []
