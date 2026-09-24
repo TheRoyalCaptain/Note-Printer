@@ -1,5 +1,4 @@
 import io
-import os
 import re
 import subprocess
 import tempfile
@@ -7,6 +6,9 @@ from datetime import datetime
 from urllib.parse import unquote
 
 from flask import Flask, jsonify, render_template, request, send_file
+from reportlab.graphics import renderPDF
+from reportlab.graphics.barcode.qr import QrCodeWidget
+from reportlab.graphics.shapes import Drawing
 from reportlab.lib.colors import HexColor
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -56,17 +58,26 @@ def validate(payload):
         raise ValueError("Ongeldige invoer.")
     title = str(payload.get("title", "")).strip()
     body = str(payload.get("body", "")).strip().replace("\r\n", "\n").replace("\r", "\n")
-    if not title and not body:
-        raise ValueError("Vul een titel of een notitie in.")
+    qr = str(payload.get("qr", "")).strip()
+    if not title and not body and not qr:
+        raise ValueError("Vul een titel, notitie of QR-inhoud in.")
     if len(title) > 80 or len(body) > 2500:
         raise ValueError("De notitie is te lang (maximaal 80 tekens titel en 2500 tekens tekst).")
+    if len(qr) > 300:
+        raise ValueError("De QR-inhoud mag maximaal 300 tekens bevatten.")
     try:
         copies = int(payload.get("copies", 1))
     except (TypeError, ValueError):
         raise ValueError("Het aantal exemplaren moet tussen 1 en 10 liggen.") from None
     if copies < 1 or copies > 10:
         raise ValueError("Het aantal exemplaren moet tussen 1 en 10 liggen.")
-    return title, body, copies, bool(payload.get("date", False))
+    return {
+        "title": title, "body": body, "copies": copies,
+        "date": payload.get("date") is True,
+        "checklist": payload.get("checklist") is True,
+        "paginate": payload.get("paginate") is True,
+        "qr": qr,
+    }
 
 
 def wrap_line(line, font, size, width):
@@ -93,47 +104,89 @@ def wrap_line(line, font, size, width):
     return output
 
 
-def make_pdf(title, body, include_date):
+def plan_labels(note):
+    pad, usable = 11, LABEL_WIDTH - 22
+    title = note["title"]
+    title_size = 14
+    while title_size > 9 and len(wrap_line(title, BOLD, title_size, usable)) > 3:
+        title_size -= 1
+    title_lines = wrap_line(title, BOLD, title_size, usable) if title else []
+    if len(title_lines) > 3:
+        raise ValueError("De titel past niet op het label.")
+    header_height = sum(title_size * 1.28 for _ in title_lines) + (16 if title_lines else 0)
+    top = LABEL_HEIGHT - 13 - header_height
+    footer = 22 if note["date"] or note["paginate"] else 11
+    qr_height = 93 if note["qr"] else 0
+    size = 9 if note["paginate"] else 11
+    if not note["paginate"]:
+        sizes = (11, 10, 9, 8, 7)
+    else:
+        sizes = (size,)
+    for size in sizes:
+        lines = []
+        for raw in note["body"].split("\n") if note["body"] else []:
+            wrapped = wrap_line(raw, FONT, size, usable - (14 if note["checklist"] and raw.strip() else 0))
+            lines.extend((part, index == 0 and bool(raw.strip())) for index, part in enumerate(wrapped))
+        step = size * 1.35
+        capacity = int((top - footer) / step)
+        final_capacity = int((top - footer - qr_height) / step)
+        if capacity < 1 or final_capacity < 0:
+            raise ValueError("De titel en QR-code laten geen ruimte voor de notitie.")
+        if not note["paginate"]:
+            if len(lines) <= final_capacity:
+                return {"pages": [lines], "size": size, "title_lines": title_lines, "title_size": title_size, "top": top}
+            continue
+        if len(lines) <= final_capacity:
+            pages = [lines]
+        else:
+            final_lines = lines[-final_capacity:] if final_capacity else []
+            remaining = lines[:-final_capacity] if final_capacity else lines
+            pages = [remaining[i:i + capacity] for i in range(0, len(remaining), capacity)] + [final_lines]
+        if len(pages) > 10:
+            raise ValueError("Maximaal 10 labels per notitie. Kort de tekst in.")
+        return {"pages": pages, "size": size, "title_lines": title_lines, "title_size": title_size, "top": top}
+    raise ValueError("De tekst past niet op één label. Zet ‘Meerdere labels’ aan of kort de notitie in.")
+
+
+def make_pdf(note, plan=None):
+    plan = plan or plan_labels(note)
     buf = io.BytesIO()
     pdf = canvas.Canvas(buf, pagesize=(LABEL_WIDTH, LABEL_HEIGHT), pageCompression=1)
     pdf.setTitle("Note Printer")
     pad, usable = 11, LABEL_WIDTH - 22
-    y = LABEL_HEIGHT - 13
-    if title:
-        title_size = 14
-        while title_size >= 9 and len(wrap_line(title, BOLD, title_size, usable)) > 3:
-            title_size -= 1
-        lines = wrap_line(title, BOLD, title_size, usable)
-        if len(lines) > 3:
-            raise ValueError("De titel past niet op het label.")
-        pdf.setFont(BOLD, title_size)
-        for line in lines:
-            y -= title_size * 1.28
-            pdf.drawString(pad, y, line)
-        y -= 8
-        pdf.setStrokeColor(HexColor("#aaaaaa"))
-        pdf.line(pad, y, LABEL_WIDTH - pad, y)
-        y -= 8
-    if body:
-        best = None
-        for size in (11, 10, 9, 8, 7):
-            lines = [part for paragraph in body.split("\n") for part in wrap_line(paragraph, FONT, size, usable)]
-            bottom = 20 if include_date else 11
-            if y - (len(lines) * size * 1.35) >= bottom:
-                best = size, lines
-                break
-        if best is None:
-            raise ValueError("De tekst past niet op één label. Kort de notitie in.")
-        size, lines = best
-        pdf.setFont(FONT, size)
-        for line in lines:
-            y -= size * 1.35
-            pdf.drawString(pad, y, line)
-    if include_date:
+    count = len(plan["pages"])
+    for page_number, lines in enumerate(plan["pages"], 1):
+        y = LABEL_HEIGHT - 13
+        if note["title"]:
+            pdf.setFont(BOLD, plan["title_size"])
+            for line in plan["title_lines"]:
+                y -= plan["title_size"] * 1.28
+                pdf.drawString(pad, y, line)
+            y -= 8
+            pdf.setStrokeColor(HexColor("#aaaaaa"))
+            pdf.line(pad, y, LABEL_WIDTH - pad, y)
+            y -= 8
+        pdf.setFillColor(HexColor("#17202b"))
+        pdf.setFont(FONT, plan["size"])
+        for line, checkbox in lines:
+            y -= plan["size"] * 1.35
+            if note["checklist"] and checkbox:
+                pdf.rect(pad, y - 1, 7, 7, fill=0, stroke=1)
+            pdf.drawString(pad + (14 if note["checklist"] and checkbox else 0), y, line)
+        if note["qr"] and page_number == count:
+            qr = QrCodeWidget(note["qr"], barLevel="M")
+            left, bottom, right, top = qr.getBounds()
+            size = 80
+            drawing = Drawing(size, size, transform=[size / (right - left), 0, 0, size / (top - bottom), 0, 0])
+            drawing.add(qr)
+            renderPDF.draw(drawing, pdf, pad, 24 if note["date"] or count > 1 else 11)
         pdf.setFont(FONT, 7)
         pdf.setFillColor(HexColor("#555555"))
-        pdf.drawString(pad, 9, datetime.now().strftime("%d-%m-%Y %H:%M"))
-    pdf.showPage()
+        if note["date"]:
+            pdf.drawString(pad, 9, datetime.now().strftime("%d-%m-%Y %H:%M"))
+        if count > 1:
+            pdf.drawRightString(LABEL_WIDTH - pad, 9, f"{page_number}/{count}")
+        pdf.showPage()
     pdf.save()
     buf.seek(0)
     return buf
@@ -156,8 +209,18 @@ def status():
 @app.post("/api/preview")
 def preview():
     try:
-        title, body, _, date = validate(request.get_json(silent=True))
-        return send_file(make_pdf(title, body, date), mimetype="application/pdf", download_name="notitie.pdf", as_attachment=False)
+        note = validate(request.get_json(silent=True))
+        return send_file(make_pdf(note), mimetype="application/pdf", download_name="notitie.pdf", as_attachment=False)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+
+
+@app.post("/api/layout")
+def layout():
+    try:
+        note = validate(request.get_json(silent=True))
+        plan = plan_labels(note)
+        return jsonify(pages=len(plan["pages"]), first_page=[{"text": line, "checkbox": checkbox} for line, checkbox in plan["pages"][0]])
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
 
@@ -165,13 +228,13 @@ def preview():
 @app.post("/api/print")
 def print_note():
     try:
-        title, body, copies, date = validate(request.get_json(silent=True))
-        pdf = make_pdf(title, body, date)
+        note = validate(request.get_json(silent=True))
+        pdf = make_pdf(note)
         configure_printer()
         with tempfile.NamedTemporaryFile(suffix=".pdf") as file:
             file.write(pdf.getvalue())
             file.flush()
-            result = command(["lp", "-d", PRINTER_NAME, "-n", str(copies), "-o", "media=w154h286.1", "-o", "fit-to-page", file.name], timeout=30)
+            result = command(["lp", "-d", PRINTER_NAME, "-n", str(note["copies"]), "-o", "media=w154h286.1", "-o", "fit-to-page", "-o", "Collate=True", file.name], timeout=30)
         if result.returncode:
             raise ValueError(result.stderr.strip() or "De afdruktaak is mislukt.")
         return jsonify(message="Afdruktaak verzonden", job=result.stdout.strip())
