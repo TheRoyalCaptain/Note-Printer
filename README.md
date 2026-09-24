@@ -9,7 +9,7 @@ Een zelfstandige Umbrel-app om notities op een via USB aangesloten DYMO LabelWri
 - Datum en tijd toevoegen en 1–10 exemplaren kiezen.
 - De LabelWriter automatisch herkennen en de CUPS-printer bij het afdrukken instellen.
 - Te lange notities tegenhouden voordat een afdruktaak wordt verzonden.
-- Sjablonen voor boodschappen, taken, herinneringen en berichtjes.
+- Sjablonen met een eigen labelindeling voor boodschappen, taken, herinneringen en berichtjes.
 - Optionele afvinkvakjes vóór elke ingevulde regel.
 - Lange notities optioneel over maximaal 10 genummerde labels verdelen.
 - Een QR-code van maximaal 300 tekens met een link of andere tekst op het laatste label.
@@ -25,7 +25,9 @@ De GitHub Actions-workflow bouwt de image voor AMD64 en ARM64 en publiceert deze
 
 ## Gebruik
 
-Open Note Printer vanuit Umbrel, kies eventueel een sjabloon en druk op **Toepassen**. Pas de tekst aan, zet desgewenst afvinkvakjes of meerdere labels aan, en voeg QR-inhoud toe. Het scherm vermeldt het aantal labels per exemplaar. Bekijk de volledige PDF voordat je op **Print notitie** drukt. De printer moet zijn aangesloten op het apparaat waarop Umbrel draait. De DYMO 5-serie wordt niet ondersteund. Printen moet op jouw hardware worden gecontroleerd.
+Open Note Printer vanuit Umbrel, kies eventueel een sjabloon en druk op **Toepassen**. Dat vult voorbeeldtekst in én zet de bijpassende labelindeling aan. Boodschappen hebben een donkere kop en afvinkregels, taken een genummerde lijst, herinneringen een opvallende titel met accentlijn en berichten een omlijnd tekstvak. Je kunt de tekst daarna aanpassen zonder de gekozen indeling te verliezen. Kies **Vrije notitie → Toepassen** om de tekst te behouden en de standaardindeling te gebruiken.
+
+Zet desgewenst afvinkvakjes of meerdere labels aan en voeg QR-inhoud toe. Het scherm vermeldt het aantal labels per exemplaar. Bekijk de volledige PDF voordat je op **Print notitie** drukt. De printer moet zijn aangesloten op het apparaat waarop Umbrel draait. De DYMO 5-serie wordt niet ondersteund. Printen moet op jouw hardware worden gecontroleerd.
 
 ## Lokale ontwikkeling
 

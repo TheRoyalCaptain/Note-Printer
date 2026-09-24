@@ -20,6 +20,17 @@ LABEL_WIDTH, LABEL_HEIGHT = 154, 286  # CUPS PPD 99014, points
 PRINTER_NAME = "NotePrinter"
 FONT = "DejaVu"
 BOLD = "DejaVu-Bold"
+TEMPLATE_HEADINGS = {
+    "shopping": "BOODSCHAPPEN",
+    "tasks": "TAKEN",
+    "reminder": "HERINNERING",
+    "message": "BERICHT",
+}
+TEMPLATE_TITLES = {
+    "shopping": "Boodschappen",
+    "tasks": "Taken",
+    "message": "Berichtje",
+}
 pdfmetrics.registerFont(TTFont(FONT, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
 pdfmetrics.registerFont(TTFont(BOLD, "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
 
@@ -65,6 +76,9 @@ def validate(payload):
         raise ValueError("De notitie is te lang (maximaal 80 tekens titel en 2500 tekens tekst).")
     if len(qr) > 300:
         raise ValueError("De QR-inhoud mag maximaal 300 tekens bevatten.")
+    template = str(payload.get("template", "") or "")
+    if template and template not in TEMPLATE_HEADINGS:
+        raise ValueError("Onbekend sjabloon.")
     try:
         copies = int(payload.get("copies", 1))
     except (TypeError, ValueError):
@@ -77,6 +91,7 @@ def validate(payload):
         "checklist": payload.get("checklist") is True,
         "paginate": payload.get("paginate") is True,
         "qr": qr,
+        "template": template,
     }
 
 
@@ -106,35 +121,39 @@ def wrap_line(line, font, size, width):
 
 def plan_labels(note):
     pad, usable = 11, LABEL_WIDTH - 22
+    template = note["template"]
     title = note["title"]
-    title_size = 14
-    while title_size > 9 and len(wrap_line(title, BOLD, title_size, usable)) > 3:
+    visible_title = "" if title.casefold() == TEMPLATE_TITLES.get(template, "\0").casefold() else title
+    title_size = 16 if template == "reminder" else (12 if template else 14)
+    while title_size > 9 and len(wrap_line(visible_title, BOLD, title_size, usable - (8 if template in ("reminder", "message") else 0))) > 3:
         title_size -= 1
-    title_lines = wrap_line(title, BOLD, title_size, usable) if title else []
+    title_lines = wrap_line(visible_title, BOLD, title_size, usable - (8 if template in ("reminder", "message") else 0)) if visible_title else []
     if len(title_lines) > 3:
         raise ValueError("De titel past niet op het label.")
-    header_height = sum(title_size * 1.28 for _ in title_lines) + (16 if title_lines else 0)
+    banner_height = {"shopping": 31, "tasks": 28, "reminder": 31, "message": 29}.get(template, 0)
+    header_height = banner_height + sum(title_size * 1.28 for _ in title_lines) + (16 if title_lines else 0)
     top = LABEL_HEIGHT - 13 - header_height
     footer = 22 if note["date"] or note["paginate"] else 11
     qr_height = 93 if note["qr"] else 0
-    size = 9 if note["paginate"] else 11
-    if not note["paginate"]:
-        sizes = (11, 10, 9, 8, 7)
-    else:
-        sizes = (size,)
+    sizes = ((10,) if template == "reminder" else (9,)) if note["paginate"] else ((12, 11, 10, 9, 8) if template == "reminder" else (11, 10, 9, 8, 7))
+    offset = 28 if template == "tasks" else 16 if template == "shopping" else 10 if template in ("reminder", "message") else 14 if note["checklist"] else 0
+    spacing = 1.6 if template in ("shopping", "tasks") else 1.45 if template in ("reminder", "message") else 1.35
     for size in sizes:
         lines = []
+        item_number = 0
         for raw in note["body"].split("\n") if note["body"] else []:
-            wrapped = wrap_line(raw, FONT, size, usable - (14 if note["checklist"] and raw.strip() else 0))
-            lines.extend((part, index == 0 and bool(raw.strip())) for index, part in enumerate(wrapped))
-        step = size * 1.35
+            if raw.strip():
+                item_number += 1
+            wrapped = wrap_line(raw, FONT, size, usable - offset)
+            lines.extend((part, index == 0 and bool(raw.strip()), item_number, index == len(wrapped) - 1) for index, part in enumerate(wrapped))
+        step = size * spacing
         capacity = int((top - footer) / step)
         final_capacity = int((top - footer - qr_height) / step)
         if capacity < 1 or final_capacity < 0:
             raise ValueError("De titel en QR-code laten geen ruimte voor de notitie.")
         if not note["paginate"]:
             if len(lines) <= final_capacity:
-                return {"pages": [lines], "size": size, "title_lines": title_lines, "title_size": title_size, "top": top}
+                return {"pages": [lines], "size": size, "title_lines": title_lines, "title_size": title_size, "top": top, "banner_height": banner_height, "visible_title": visible_title, "offset": offset, "step": step}
             continue
         if len(lines) <= final_capacity:
             pages = [lines]
@@ -144,7 +163,7 @@ def plan_labels(note):
             pages = [remaining[i:i + capacity] for i in range(0, len(remaining), capacity)] + [final_lines]
         if len(pages) > 10:
             raise ValueError("Maximaal 10 labels per notitie. Kort de tekst in.")
-        return {"pages": pages, "size": size, "title_lines": title_lines, "title_size": title_size, "top": top}
+        return {"pages": pages, "size": size, "title_lines": title_lines, "title_size": title_size, "top": top, "banner_height": banner_height, "visible_title": visible_title, "offset": offset, "step": step}
     raise ValueError("De tekst past niet op één label. Zet ‘Meerdere labels’ aan of kort de notitie in.")
 
 
@@ -155,24 +174,74 @@ def make_pdf(note, plan=None):
     pdf.setTitle("Note Printer")
     pad, usable = 11, LABEL_WIDTH - 22
     count = len(plan["pages"])
+    template = note["template"]
     for page_number, lines in enumerate(plan["pages"], 1):
         y = LABEL_HEIGHT - 13
-        if note["title"]:
+        if template == "shopping":
+            pdf.setFillColor(HexColor("#17202b"))
+            pdf.roundRect(pad, y - 27, usable, 27, 4, stroke=0, fill=1)
+            pdf.setFillColor(HexColor("#ffffff"))
+            pdf.setFont(BOLD, 10)
+            pdf.drawCentredString(LABEL_WIDTH / 2, y - 17, TEMPLATE_HEADINGS[template])
+        elif template == "tasks":
+            pdf.setFillColor(HexColor("#17202b"))
+            pdf.setFont(BOLD, 11)
+            pdf.drawString(pad, y - 12, TEMPLATE_HEADINGS[template])
+            pdf.setLineWidth(2)
+            pdf.line(pad, y - 20, LABEL_WIDTH - pad, y - 20)
+        elif template == "reminder":
+            pdf.setFillColor(HexColor("#17202b"))
+            pdf.rect(pad, y - 20, 4, 20, stroke=0, fill=1)
+            pdf.setFont(BOLD, 8)
+            pdf.drawString(pad + 11, y - 13, TEMPLATE_HEADINGS[template])
+            pdf.setLineWidth(0.5)
+            pdf.line(pad + 11, y - 22, LABEL_WIDTH - pad, y - 22)
+        elif template == "message":
+            pdf.setFillColor(HexColor("#17202b"))
+            pdf.setFont(BOLD, 8)
+            pdf.drawCentredString(LABEL_WIDTH / 2, y - 12, TEMPLATE_HEADINGS[template])
+            pdf.setLineWidth(0.5)
+            pdf.line(pad, y - 15, pad + 32, y - 15)
+            pdf.line(LABEL_WIDTH - pad - 32, y - 15, LABEL_WIDTH - pad, y - 15)
+        y -= plan["banner_height"]
+        if plan["visible_title"]:
             pdf.setFont(BOLD, plan["title_size"])
             for line in plan["title_lines"]:
                 y -= plan["title_size"] * 1.28
-                pdf.drawString(pad, y, line)
+                pdf.drawString(pad + (6 if template in ("reminder", "message") else 0), y, line)
             y -= 8
-            pdf.setStrokeColor(HexColor("#aaaaaa"))
-            pdf.line(pad, y, LABEL_WIDTH - pad, y)
+            if template not in ("reminder", "message"):
+                pdf.setStrokeColor(HexColor("#aaaaaa"))
+                pdf.setLineWidth(0.5)
+                pdf.line(pad, y, LABEL_WIDTH - pad, y)
             y -= 8
+        body_top = y
         pdf.setFillColor(HexColor("#17202b"))
         pdf.setFont(FONT, plan["size"])
-        for line, checkbox in lines:
-            y -= plan["size"] * 1.35
-            if note["checklist"] and checkbox:
-                pdf.rect(pad, y - 1, 7, 7, fill=0, stroke=1)
-            pdf.drawString(pad + (14 if note["checklist"] and checkbox else 0), y, line)
+        for line, first, item_number, last in lines:
+            y -= plan["step"]
+            if template == "tasks" and first:
+                pdf.setFont(BOLD, 7)
+                pdf.drawString(pad, y + 1, f"{item_number}.")
+                pdf.setFont(FONT, plan["size"])
+            if note["checklist"] and first:
+                pdf.setLineWidth(0.7)
+                pdf.setStrokeColor(HexColor("#333333"))
+                checkbox_x = pad + (14 if template == "tasks" else 0)
+                pdf.rect(checkbox_x, y - 1, 7, 7, fill=0, stroke=1)
+            if template in ("shopping", "tasks") and last and line:
+                pdf.setLineWidth(0.35)
+                pdf.setStrokeColor(HexColor("#cccccc"))
+                pdf.line(pad, y - 5, LABEL_WIDTH - pad, y - 5)
+            pdf.drawString(pad + plan["offset"], y, line)
+        if lines and template == "reminder":
+            pdf.setStrokeColor(HexColor("#222222"))
+            pdf.setLineWidth(2)
+            pdf.line(pad + 2, body_top + 1, pad + 2, y - 4)
+        elif lines and template == "message":
+            pdf.setStrokeColor(HexColor("#999999"))
+            pdf.setLineWidth(0.7)
+            pdf.roundRect(pad, y - 8, usable, body_top - y + 14, 5, stroke=1, fill=0)
         if note["qr"] and page_number == count:
             qr = QrCodeWidget(note["qr"], barLevel="M")
             left, bottom, right, top = qr.getBounds()
@@ -220,7 +289,10 @@ def layout():
     try:
         note = validate(request.get_json(silent=True))
         plan = plan_labels(note)
-        return jsonify(pages=len(plan["pages"]), first_page=[{"text": line, "checkbox": checkbox} for line, checkbox in plan["pages"][0]])
+        return jsonify(
+            pages=len(plan["pages"]), template=note["template"], title=plan["visible_title"],
+            first_page=[{"text": line, "checkbox": first, "number": number, "last": last} for line, first, number, last in plan["pages"][0]],
+        )
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
 

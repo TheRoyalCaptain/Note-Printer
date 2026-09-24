@@ -69,6 +69,33 @@ class NotePrinterTests(unittest.TestCase):
         self.assertEqual(arguments[arguments.index('-n') + 1], '2')
         self.assertIn('Collate=True', arguments)
 
+    def test_each_template_changes_the_printed_label(self):
+        cases = [
+            ('shopping', 'Boodschappen', 'BOODSCHAPPEN'),
+            ('tasks', 'Taken', 'TAKEN'),
+            ('reminder', 'Niet vergeten', 'HERINNERING'),
+            ('message', 'Berichtje', 'BERICHT'),
+        ]
+        for template, title, heading in cases:
+            with self.subTest(template=template):
+                payload = {'template': template, 'title': title, 'body': 'Eerste regel\nTweede regel', 'checklist': True}
+                layout = self.client.post('/api/layout', json=payload)
+                self.assertEqual(layout.status_code, 200)
+                self.assertEqual(layout.json['template'], template)
+                self.assertTrue(layout.json['first_page'][0]['checkbox'])
+                pdf = self.client.post('/api/preview', json=payload)
+                self.assertEqual(pdf.status_code, 200)
+                text = PdfReader(io.BytesIO(pdf.data)).pages[0].extract_text()
+                self.assertIn(heading, text)
+                self.assertIn('Eerste regel', text)
+                if template == 'tasks':
+                    self.assertIn('1.', text)
+                    self.assertIn('2.', text)
+
+    def test_unrecognised_template_is_rejected(self):
+        response = self.client.post('/api/preview', json={'template': 'other', 'body': 'Test'})
+        self.assertEqual(response.status_code, 400)
+
 
 if __name__ == '__main__':
     unittest.main()
